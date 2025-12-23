@@ -4,6 +4,7 @@
 #include <string>
 #include <filesystem>
 #include <set>
+#include "keypress.hpp"
 namespace fs = std::filesystem;
 
 using namespace std;
@@ -36,22 +37,9 @@ string cutName(const char* name, int index){
 
 void uni_clear(){
     #ifdef _WIN32
-    COORD topLeft  = { 0, 0 };
-    HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
-    CONSOLE_SCREEN_BUFFER_INFO screen;
-    DWORD written;
-
-    GetConsoleScreenBufferInfo(console, &screen);
-    FillConsoleOutputCharacterA(
-        console, ' ', screen.dwSize.X * screen.dwSize.Y, topLeft, &written
-    );
-    FillConsoleOutputAttribute(
-        console, FOREGROUND_GREEN | FOREGROUND_RED | FOREGROUND_BLUE,
-        screen.dwSize.X * screen.dwSize.Y, topLeft, &written
-    );
-    SetConsoleCursorPosition(console, topLeft);
+    system("cls");
     #else
-    std::cout << "\x1B[2J\x1B[H";
+    system("clear");
     #endif
 }
 
@@ -79,7 +67,7 @@ void displayInterface(const char* name, float cursor, float lenght){
         nsindx = 0;
     cout << "‖|";
     for(int i = 0; i < 20; i++){
-        if(cursor/lenght > 0.05*i){
+        if(cursor/lenght > 0.05*(i+1)){
             cout << "█";
         }
         else{
@@ -111,7 +99,6 @@ int main(){
     
     for (auto &entry : sorted_by_name){
         if(entry.has_extension() && isOneOfTheStrings(entry.extension().string().c_str(), supportedExtentions, 3)){
-            cout << "\n";
             result = ma_sound_init_from_file(&engine, entry.filename().c_str(), 0, NULL, NULL, &sound);
             if (result != MA_SUCCESS) {
                 return result;
@@ -123,19 +110,57 @@ int main(){
             ma_sound_start(&sound);
             bool setFadeOut = false;
             float lcursor = 0.0;
-            while(ma_sound_is_playing(&sound)){
-                float cursor;
-                ma_sound_get_cursor_in_seconds(&sound, &cursor);
-                if(lcursor+1 < cursor){
-                    displayInterface(entry.filename().c_str(), cursor, length);
-                    lcursor = cursor;
+            bool paused = false;
+            float cursor_paused = 0.0;
+            bool waitASecondPlease = false;
+            while(ma_sound_is_playing(&sound) || paused || waitASecondPlease){
+                if(!paused){
+                    float cursor;
+                    ma_sound_get_cursor_in_seconds(&sound, &cursor);
+                    if(lcursor+1 < cursor){
+                        if(waitASecondPlease){
+                            waitASecondPlease = false;
+                        }
+                        displayInterface(entry.filename().c_str(), cursor, length);
+                        lcursor = cursor;
+                    }
+                    if (cursor + 0.07 > length && !setFadeOut){
+                        ma_sound_set_fade_in_milliseconds(&sound, -1, 0, 50);
+                        setFadeOut = true;
+                    }
                 }
-                if (cursor + 0.07 > length && !setFadeOut){
-                    ma_sound_set_fade_in_milliseconds(&sound, -1, 0, 50);
-                    setFadeOut = true;
+                if (keyPressed()){
+                    char key = getKey();
+                    if(key == ' ' && !waitASecondPlease){
+                        if(!paused){
+                            paused = true;
+                            ma_sound_stop_with_fade_in_milliseconds(&sound, 250);
+                            ma_sound_get_cursor_in_seconds(&sound, &cursor_paused);
+                            cout << "*Paused*\n";
+                        }
+                        else{
+                            ma_sound_uninit(&sound);
+                            paused = false;
+                            result = ma_sound_init_from_file(&engine, entry.filename().c_str(), 0, NULL, NULL, &sound);
+                            if (result != MA_SUCCESS) {
+                                return result;
+                            }
+                            ma_sound_set_fade_in_milliseconds(&sound, 0, 1, 250);
+                            ma_sound_seek_to_second(&sound, cursor_paused);
+                            ma_sound_start(&sound);
+                            waitASecondPlease = true;
+                        }
+                    }
+                    else if (key == '=')
+                    {
+                        ma_sound_stop_with_fade_in_milliseconds(&sound, 250);
+                    }
+                    
                 }
             }
             ma_sound_uninit(&sound);
+            uni_clear();
+            cout << entry.filename().c_str() << " finished playing.";
         }
     }
 }
