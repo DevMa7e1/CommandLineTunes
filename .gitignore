@@ -30,3 +30,7 @@
 *.exe
 *.out
 *.app
+
+#Development stuff
+miniaudio.h
+*.wav
