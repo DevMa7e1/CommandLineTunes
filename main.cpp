@@ -62,10 +62,10 @@ void displayInterface(const char* name, float cursor, float lenght){
         cout << "‖" << endl;
     }
     if(namelen-22 > 0)
-        nsindx = (nsindx+1)%(namelen-22);
+        nsindx = (nsindx+1)%(namelen-21);
     else
         nsindx = 0;
-    cout << "‖|";
+    cout << "‖>";
     for(int i = 0; i < 20; i++){
         if(cursor/lenght > 0.05*(i+1)){
             cout << "█";
@@ -74,7 +74,7 @@ void displayInterface(const char* name, float cursor, float lenght){
             cout << " ";
         }
     }
-    cout << "|‖" << endl;
+    cout << "<‖" << endl;
     for(int i = 0; i < 24; i++){
         cout << "=";
     }
@@ -82,8 +82,13 @@ void displayInterface(const char* name, float cursor, float lenght){
 }
 
 const char* supportedExtentions[3] = {".wav", ".flac", ".mp3"};
+const char* start_at[1] = {"--start-at"};
+const char* fade_time[1] = {"--fade-time"};
+bool startAtDone = false;
+float fade_duration = 50;
+string specified = "";
 
-int main(){
+int main(int argc, char** argv){
     ma_result result;
     ma_sound sound;
     ma_engine engine;
@@ -96,8 +101,21 @@ int main(){
 
     for (auto &entry : fs::directory_iterator(path))
         sorted_by_name.insert(entry.path());
-    
+    if(argc > 1){
+        for(int i = 0; i < argc; i++){
+            if(isOneOfTheStrings(argv[i], start_at, 1) && !startAtDone){
+                specified = argv[i+1];
+            }
+            else if(isOneOfTheStrings(argv[i], fade_time, 1)){
+                fade_duration = atof(argv[i+1]);
+            }
+        }
+    }
     for (auto &entry : sorted_by_name){
+        if(specified != "" && specified != entry.filename().string())
+            continue;
+        else                        
+            startAtDone = true;
         if(entry.has_extension() && isOneOfTheStrings(entry.extension().string().c_str(), supportedExtentions, 3)){
             result = ma_sound_init_from_file(&engine, entry.filename().c_str(), 0, NULL, NULL, &sound);
             if (result != MA_SUCCESS) {
@@ -106,7 +124,7 @@ int main(){
             float length;
             ma_sound_set_start_time_in_milliseconds(&sound, 0);
             ma_sound_get_length_in_seconds(&sound, &length);
-            ma_sound_set_fade_in_milliseconds(&sound, 0, 1, 50);
+            ma_sound_set_fade_in_milliseconds(&sound, 0, 1, fade_duration);
             ma_sound_start(&sound);
             bool setFadeOut = false;
             float lcursor = 0.0;
@@ -124,8 +142,8 @@ int main(){
                         displayInterface(entry.filename().c_str(), cursor, length);
                         lcursor = cursor;
                     }
-                    if (cursor + 0.07 > length && !setFadeOut){
-                        ma_sound_set_fade_in_milliseconds(&sound, -1, 0, 50);
+                    if (cursor + fade_duration/1000 + 0.02 > length && !setFadeOut){
+                        ma_sound_set_fade_in_milliseconds(&sound, -1, 0, fade_duration);
                         setFadeOut = true;
                     }
                 }
@@ -151,11 +169,20 @@ int main(){
                             waitASecondPlease = true;
                         }
                     }
-                    else if (key == '=')
+                    else if(key == 0x09)
                     {
                         ma_sound_stop_with_fade_in_milliseconds(&sound, 250);
                     }
-                    
+                    else if(key == '-'){
+                        if(ma_sound_get_volume(&sound) > 0)
+                            ma_sound_set_volume(&sound, ma_sound_get_volume(&sound)-0.05);
+                        cout << "Volume: " << round(ma_sound_get_volume(&sound)*100) << "%" << endl;
+                    }
+                    else if(key == '='){
+                        if(ma_sound_get_volume(&sound) < 1)
+                            ma_sound_set_volume(&sound, ma_sound_get_volume(&sound)+0.05);
+                        cout << "Volume: " << round(ma_sound_get_volume(&sound)*100) << "%" << endl;
+                    }
                 }
             }
             ma_sound_uninit(&sound);
