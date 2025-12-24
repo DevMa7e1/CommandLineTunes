@@ -43,6 +43,16 @@ void uni_clear(){
     #endif
 }
 
+#ifdef WIN32
+#include <windows.h>
+string block = "]";
+string bar = "|";
+#else
+#include <unistd.h>
+string block = "█";
+string bar = "‖";
+#endif
+
 int nsindx = 0;
 void displayInterface(const char* name, float cursor, float lenght){
     uni_clear();
@@ -53,28 +63,28 @@ void displayInterface(const char* name, float cursor, float lenght){
         cout << "=";
     }
     if(namelen > 22)
-        cout << endl << "‖" << cutName(name, nsindx) << "‖" << endl;
+        cout << endl << bar << cutName(name, nsindx) << bar << endl;
     else{
-        cout << endl << "‖" << name;
+        cout << endl << bar << name;
         for(int i = 0; i < 22-namelen; i++){
             cout << " ";
         }
-        cout << "‖" << endl;
+        cout << bar << endl;
     }
     if(namelen-22 > 0)
         nsindx = (nsindx+1)%(namelen-21);
     else
         nsindx = 0;
-    cout << "‖>";
+    cout << bar << ">";
     for(int i = 0; i < 20; i++){
         if(cursor/lenght > 0.05*(i+1)){
-            cout << "█";
+            cout << block;
         }
         else{
             cout << " ";
         }
     }
-    cout << "<‖" << endl;
+    cout << "<" << bar << endl;
     for(int i = 0; i < 24; i++){
         cout << "=";
     }
@@ -117,7 +127,7 @@ int main(int argc, char** argv){
         else                        
             startAtDone = true;
         if(entry.has_extension() && isOneOfTheStrings(entry.extension().string().c_str(), supportedExtentions, 3)){
-            result = ma_sound_init_from_file(&engine, entry.filename().c_str(), MA_SOUND_FLAG_NO_PITCH+MA_SOUND_FLAG_NO_SPATIALIZATION, NULL, NULL, &sound);
+            result = ma_sound_init_from_file(&engine, entry.filename().string().c_str(), MA_SOUND_FLAG_NO_PITCH+MA_SOUND_FLAG_NO_SPATIALIZATION, NULL, NULL, &sound);
             if (result != MA_SUCCESS) {
                 return result;
             }
@@ -139,7 +149,7 @@ int main(int argc, char** argv){
                         if(waitASecondPlease){
                             waitASecondPlease = false;
                         }
-                        displayInterface(entry.filename().c_str(), cursor, length);
+                        displayInterface(entry.filename().string().c_str(), cursor, length);
                         lcursor = cursor;
                     }
                     if (cursor + fade_duration/1000 + 0.02 > length && !setFadeOut){
@@ -159,7 +169,7 @@ int main(int argc, char** argv){
                         else{
                             ma_sound_uninit(&sound);
                             paused = false;
-                            result = ma_sound_init_from_file(&engine, entry.filename().c_str(), 0, NULL, NULL, &sound);
+                            result = ma_sound_init_from_file(&engine, entry.filename().string().c_str(), 0, NULL, NULL, &sound);
                             if (result != MA_SUCCESS) {
                                 return result;
                             }
@@ -184,10 +194,11 @@ int main(int argc, char** argv){
                         cout << "Volume: " << round(ma_sound_get_volume(&sound)*100) << "%" << endl;
                     }
                 }
+                sleep(0.01);
             }
             ma_sound_uninit(&sound);
             uni_clear();
-            cout << entry.filename().c_str() << " finished playing.";
+            cout << entry.filename().string().c_str() << " finished playing.";
         }
     }
 }

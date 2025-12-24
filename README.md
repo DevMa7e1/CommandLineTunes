@@ -37,8 +37,16 @@ Steps:
 4. Unzip the source code
 5. Move the miniaudio.h file into the directory with the source code
 6. Open a terminal in that directory
-7. Run the command `g++ miniaudio.c main.cpp -o cltunes.exe`
+7. Run the command `g++ miniaudio.c main.cpp -o cltunes.exe -static`
 8. Done
 
 ### MacOS
-To be continued...
+Steps:
+1. Install brew
+2. In a terminal, run `brew install gcc`
+3. Download a copy of the source code from [here](https://github.com/DevMa7e1/CommandLineTunes/archive/refs/heads/main.zip)
+4. Download a copy of miniaudio.h from [here](https://raw.githubusercontent.com/mackron/miniaudio/master/miniaudio.h) (right click, Save Page As...)
+5. Rename the resulting file to miniaudio.h
+6. Put the copy of miniaudio.h in the same directory as the source code
+7. Go into the directory containing the source code
+8. In a terminal, run `g++ miniaudio.c main.cpp -o cltunes -std=c++17`
