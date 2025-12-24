@@ -26,6 +26,19 @@ Steps:
 2. Obtain a copy of the source code - `git clone https://github.com/DevMa7e1/CommandLineTunes`
 3. Put the copy of miniaudio.h in the same directory as the source code - `mv miniaudio.h ./CommandLineTunes/`
 4. Go into the directory containing the source code - `cd CommandLineTunes`
-5. Compile with g++ - `g++ ./miniaudio.c ./main.cpp -o main.out -ldl -lpthread -lm`
+5. Compile with g++ - `g++ ./miniaudio.c ./main.cpp -o cltunes -ldl -lpthread -lm`
 
-### To continue ...
+### Windows
+Steps:
+1. Install Chocolatey
+2. In a terminal, run `choco install mingw`
+2. Download a copy of the source code from [here](https://github.com/DevMa7e1/CommandLineTunes/archive/refs/heads/main.zip)
+3. Download a copy of miniaudio.h from [here](https://raw.githubusercontent.com/mackron/miniaudio/master/miniaudio.h) (hit ctrl+s on the page)
+4. Unzip the source code
+5. Move the miniaudio.h file into the directory with the source code
+6. Open a terminal in that directory
+7. Run the command `g++ miniaudio.c main.cpp -o cltunes.exe`
+8. Done
+
+### MacOS
+To be continued...
