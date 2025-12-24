@@ -112,12 +112,12 @@ int main(int argc, char** argv){
         }
     }
     for (auto &entry : sorted_by_name){
-        if(specified != "" && specified != entry.filename().string())
+        if(specified != "" && specified != entry.filename().string() && !startAtDone)
             continue;
         else                        
             startAtDone = true;
         if(entry.has_extension() && isOneOfTheStrings(entry.extension().string().c_str(), supportedExtentions, 3)){
-            result = ma_sound_init_from_file(&engine, entry.filename().c_str(), 0, NULL, NULL, &sound);
+            result = ma_sound_init_from_file(&engine, entry.filename().c_str(), MA_SOUND_FLAG_NO_PITCH+MA_SOUND_FLAG_NO_SPATIALIZATION, NULL, NULL, &sound);
             if (result != MA_SUCCESS) {
                 return result;
             }
