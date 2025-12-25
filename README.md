@@ -6,12 +6,12 @@ Simple audio player with a CLI.
 * Basic volume controls and the ability to skip songs
 * Plays mp3, wav and flac files
 ## Controls
-| Key | Action |
-|-----|--------|
-| Tab | Skip song |
-| Space | Pause |
+| Key        | Action          |
+|------------|-----------------|
+| Tab        | Skip song       |
+| Space      | Pause           |
 | Equals key | Increase volume |
-| Minus key | Decrease volume |
+| Minus key  | Decrease volume |
 ## Arguments
 | Argument                     | What it does                             |
 |------------------------------|------------------------------------------|
@@ -19,6 +19,28 @@ Simple audio player with a CLI.
 | --fade-time < milliseconds > | Milliseconds of fade between songs       |
 ## General information
 This software is written in C++. For audio playback, it uses the Miniaudio library.
+## How to install
+### Linux:
+Steps:
+1. Download the install.sh script - `wget https://raw.githubusercontent.com/DevMa7e1/CommandLineTunes/refs/heads/main/install.sh`
+2. Chmod the script - `chmod +x install.sh`
+3. Run the script as root - `sudo ./install.sh`
+
+Done! Now you can just run the `cltunes` command in a terminal and start using CommandLineTunes. To get more information on how to use CommandLineTunes, check out the **How to use** section.
+### Windows:
+Steps:
+1. Download the install.bat script from [here](https://raw.githubusercontent.com/DevMa7e1/CommandLineTunes/refs/heads/main/install.bat) (hit ctrl+s on the page)
+2. In the Windows Start Menu search bar, type cmd
+3. Click on run as administrator
+4. Drag the install.bat script into the cmd window
+5. Hit enter
+6. Restart
+
+Done! Now you can just run the `cltunes` command in a terminal and start using CommandLineTunes. To get more information on how to use CommandLineTunes, check out the **How to use** section.
+## How to use
+CommandLineTunes plays every audio file in a folder in alphabetical order. If you want to make a "playlist", just copy the audio files you want in that "playlist" in an empty folder.
+
+To start playing the audio files, just open a terminal, navigate to that directory and run the `cltunes` command.
 ## How to build
 ### Linux:
 Steps:
