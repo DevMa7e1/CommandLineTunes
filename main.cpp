@@ -44,9 +44,13 @@ void uni_clear(){
 }
 
 #ifdef WIN32
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 string block = "]";
 string bar = "|";
+void sleep(float seconds){
+    Sleep(seconds*1000);
+}
 #else
 #include <unistd.h>
 string block = "█";
@@ -94,9 +98,11 @@ void displayInterface(const char* name, float cursor, float lenght){
 const char* supportedExtentions[3] = {".wav", ".flac", ".mp3"};
 const char* start_at[1] = {"--start-at"};
 const char* fade_time[1] = {"--fade-time"};
+const char* preload_and_zero_transition[1] = {"--no-transition"};
 bool startAtDone = false;
 float fade_duration = 50;
 string specified = "";
+bool preload = false;
 
 int main(int argc, char** argv){
     ma_result result;
@@ -106,7 +112,7 @@ int main(int argc, char** argv){
     if (result != MA_SUCCESS) {
         return result;
     }
-    std::string path = std::filesystem::current_path();
+    std::string path = std::filesystem::current_path().string();
     set<fs::path> sorted_by_name;
 
     for (auto &entry : fs::directory_iterator(path))
@@ -119,8 +125,12 @@ int main(int argc, char** argv){
             else if(isOneOfTheStrings(argv[i], fade_time, 1)){
                 fade_duration = atof(argv[i+1]);
             }
+            else if(isOneOfTheStrings(argv[i], preload_and_zero_transition, 1)){
+                preload = true;
+            }
         }
     }
+    if(!preload){
     for (auto &entry : sorted_by_name){
         if(specified != "" && specified != entry.filename().string() && !startAtDone)
             continue;
@@ -199,6 +209,92 @@ int main(int argc, char** argv){
             ma_sound_uninit(&sound);
             uni_clear();
             cout << entry.filename().string().c_str() << " finished playing.";
+        }
+    }}
+    else{
+        ma_sound sound2;
+        bool sound_initd = false;
+        bool switchh = false;
+        int n = 0;
+        fs::path entry = *std::next(sorted_by_name.begin(), n);
+        while(!entry.has_extension() || !isOneOfTheStrings(entry.extension().string().c_str(), supportedExtentions, 3)){
+            n++;
+            if(n >= sorted_by_name.size()) break;
+            entry = *std::next(sorted_by_name.begin(), n);
+        }
+        result = ma_sound_init_from_file(&engine, entry.filename().string().c_str(), MA_SOUND_FLAG_NO_PITCH+MA_SOUND_FLAG_NO_SPATIALIZATION, NULL, NULL, &sound2);
+            if (result != MA_SUCCESS) {
+                return result;
+            }
+        while(n < sorted_by_name.size()){
+            float length;
+            float cursor;
+            bool preloaded = false;
+            if(switchh){
+                ma_sound_start(&sound);
+                ma_sound_get_length_in_seconds(&sound, &length);
+                ma_sound_uninit(&sound2);
+                sound_initd = true;
+                while(ma_sound_is_playing(&sound)){
+                    ma_sound_get_cursor_in_seconds(&sound, &cursor);
+                    if(cursor + 1 > length && !preloaded && n+1 < sorted_by_name.size()){
+                        preloaded = true;
+                        n++;
+                        entry = *std::next(sorted_by_name.begin(), n);
+                        bool didntDoAnything = false;
+                        while(!entry.has_extension() || !isOneOfTheStrings(entry.extension().string().c_str(), supportedExtentions, 3)){
+                            n++;
+                            if(n >= sorted_by_name.size()){
+                                didntDoAnything = true;
+                                break;
+                            }
+                            entry = *std::next(sorted_by_name.begin(), n);
+                        }
+                        if(!didntDoAnything){
+                            result = ma_sound_init_from_file(&engine, entry.filename().string().c_str(), MA_SOUND_FLAG_NO_PITCH+MA_SOUND_FLAG_NO_SPATIALIZATION, NULL, NULL, &sound2);
+                            if (result != MA_SUCCESS) {
+                                return result;
+                            }
+                            ma_sound_set_start_time_in_milliseconds(&sound2, 0);
+                        }
+                    }
+                    if(cursor < length-0.1)
+                        sleep(0.01);
+                }
+            }
+            else{
+                ma_sound_start(&sound2);
+                ma_sound_get_length_in_seconds(&sound2, &length);
+                if(sound_initd)
+                    ma_sound_uninit(&sound);
+                while(ma_sound_is_playing(&sound2)){
+                    ma_sound_get_cursor_in_seconds(&sound2, &cursor);
+                    if(cursor + 1 > length && !preloaded && n+1 < sorted_by_name.size()){
+                        preloaded = true;
+                        n++;
+                        entry = *std::next(sorted_by_name.begin(), n);
+                        bool didntDoAnything = false;
+                        while(!entry.has_extension() || !isOneOfTheStrings(entry.extension().string().c_str(), supportedExtentions, 3)){
+                            n++;
+                            if(n >= sorted_by_name.size()){
+                                didntDoAnything = true;
+                                break;
+                            }
+                            entry = *std::next(sorted_by_name.begin(), n);
+                        }
+                        if(!didntDoAnything){
+                            result = ma_sound_init_from_file(&engine, entry.filename().string().c_str(), MA_SOUND_FLAG_NO_PITCH+MA_SOUND_FLAG_NO_SPATIALIZATION, NULL, NULL, &sound);
+                            if (result != MA_SUCCESS) {
+                                return result;
+                            }
+                            ma_sound_set_start_time_in_milliseconds(&sound, 0);
+                        }
+                    }
+                    if(cursor < length-0.1)
+                        sleep(0.01);
+                }
+            }
+            switchh = !switchh;
         }
     }
 }

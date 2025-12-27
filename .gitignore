@@ -34,3 +34,4 @@
 #Development stuff
 miniaudio.h
 *.wav
+*.mp3
