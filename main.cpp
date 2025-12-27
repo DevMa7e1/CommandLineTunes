@@ -4,6 +4,7 @@
 #include <string>
 #include <filesystem>
 #include <set>
+#include <vector>
 #include "keypress.hpp"
 namespace fs = std::filesystem;
 
@@ -58,7 +59,7 @@ string bar = "‖";
 #endif
 
 int nsindx = 0;
-void displayInterface(const char* name, float cursor, float lenght){
+void displayInterface(const char* name, float cursor, float lenght, bool notr = false){
     uni_clear();
     cout << "\n-- CLTunes --\n";
     int namelen = 0;
@@ -66,6 +67,10 @@ void displayInterface(const char* name, float cursor, float lenght){
     for(int i = 0; i < 24; i++){
         cout << "=";
     }
+    if(namelen-22 > 0)
+        nsindx = (nsindx+1)%(namelen-21);
+    else
+        nsindx = 0;
     if(namelen > 22)
         cout << endl << bar << cutName(name, nsindx) << bar << endl;
     else{
@@ -75,11 +80,8 @@ void displayInterface(const char* name, float cursor, float lenght){
         }
         cout << bar << endl;
     }
-    if(namelen-22 > 0)
-        nsindx = (nsindx+1)%(namelen-21);
-    else
-        nsindx = 0;
     cout << bar << ">";
+    if(!notr)
     for(int i = 0; i < 20; i++){
         if(cursor/lenght > 0.05*(i+1)){
             cout << block;
@@ -87,6 +89,9 @@ void displayInterface(const char* name, float cursor, float lenght){
         else{
             cout << " ";
         }
+    }
+    else{
+        cout << "--CONTINUOUS PLAY!--";
     }
     cout << "<" << bar << endl;
     for(int i = 0; i < 24; i++){
@@ -103,6 +108,28 @@ bool startAtDone = false;
 float fade_duration = 50;
 string specified = "";
 bool preload = false;
+vector<ma_decoder> decoders;
+size_t decoder_i;
+bool basicallyDone = false;
+
+void data_callback(ma_device* device, void* output, const void*, ma_uint32 framec){
+    float *out = static_cast<float*>(output);
+    ma_uint32 frames_r = framec;
+    while(frames_r > 0 && decoder_i < decoders.size()){
+        ma_uint64 frames_read = 0;
+        ma_decoder_read_pcm_frames(&decoders[decoder_i], out, frames_r, &frames_read);
+        if(frames_read == 0){
+            decoder_i++;
+            continue;
+        }
+        out += frames_read * device->playback.channels;
+        frames_r -= frames_read;
+    }
+    if(frames_r > 0){
+        fill(out, out + frames_r * device->playback.channels, 0.0f);
+        basicallyDone = true;
+    }
+}
 
 int main(int argc, char** argv){
     ma_result result;
@@ -115,8 +142,10 @@ int main(int argc, char** argv){
     std::string path = std::filesystem::current_path().string();
     set<fs::path> sorted_by_name;
 
-    for (auto &entry : fs::directory_iterator(path))
-        sorted_by_name.insert(entry.path());
+    for (auto &entry : fs::directory_iterator(path)){
+        if(entry.path().has_extension() && isOneOfTheStrings(entry.path().extension().string().c_str(), supportedExtentions, 3))
+            sorted_by_name.insert(entry.path());
+    }
     if(argc > 1){
         for(int i = 0; i < argc; i++){
             if(isOneOfTheStrings(argv[i], start_at, 1) && !startAtDone){
@@ -136,7 +165,7 @@ int main(int argc, char** argv){
             continue;
         else                        
             startAtDone = true;
-        if(entry.has_extension() && isOneOfTheStrings(entry.extension().string().c_str(), supportedExtentions, 3)){
+        if(true){
             result = ma_sound_init_from_file(&engine, entry.filename().string().c_str(), MA_SOUND_FLAG_NO_PITCH+MA_SOUND_FLAG_NO_SPATIALIZATION, NULL, NULL, &sound);
             if (result != MA_SUCCESS) {
                 return result;
@@ -212,89 +241,41 @@ int main(int argc, char** argv){
         }
     }}
     else{
-        ma_sound sound2;
-        bool sound_initd = false;
-        bool switchh = false;
-        int n = 0;
-        fs::path entry = *std::next(sorted_by_name.begin(), n);
-        while(!entry.has_extension() || !isOneOfTheStrings(entry.extension().string().c_str(), supportedExtentions, 3)){
-            n++;
-            if(n >= sorted_by_name.size()) break;
-            entry = *std::next(sorted_by_name.begin(), n);
+        ma_decoder_config config = ma_decoder_config_init(ma_format_f32, 2, 0);
+        vector<string> names;
+        for(auto &entry : sorted_by_name){
+            ma_decoder decoder;
+            if(ma_decoder_init_file(entry.string().c_str(), &config, &decoder) != MA_SUCCESS){
+                cout << "Fatal problem loading " << entry.string() << ". Please make sure that the file is a valid audio file and try again.\n";
+                return 1;
+            }
+            decoders.push_back(decoder);
+            names.push_back(entry.filename().string());
         }
-        result = ma_sound_init_from_file(&engine, entry.filename().string().c_str(), MA_SOUND_FLAG_NO_PITCH+MA_SOUND_FLAG_NO_SPATIALIZATION, NULL, NULL, &sound2);
-            if (result != MA_SUCCESS) {
-                return result;
-            }
-        while(n < sorted_by_name.size()){
-            float length;
-            float cursor;
-            bool preloaded = false;
-            if(switchh){
-                ma_sound_start(&sound);
-                ma_sound_get_length_in_seconds(&sound, &length);
-                ma_sound_uninit(&sound2);
-                sound_initd = true;
-                while(ma_sound_is_playing(&sound)){
-                    ma_sound_get_cursor_in_seconds(&sound, &cursor);
-                    if(cursor + 1 > length && !preloaded && n+1 < sorted_by_name.size()){
-                        preloaded = true;
-                        n++;
-                        entry = *std::next(sorted_by_name.begin(), n);
-                        bool didntDoAnything = false;
-                        while(!entry.has_extension() || !isOneOfTheStrings(entry.extension().string().c_str(), supportedExtentions, 3)){
-                            n++;
-                            if(n >= sorted_by_name.size()){
-                                didntDoAnything = true;
-                                break;
-                            }
-                            entry = *std::next(sorted_by_name.begin(), n);
-                        }
-                        if(!didntDoAnything){
-                            result = ma_sound_init_from_file(&engine, entry.filename().string().c_str(), MA_SOUND_FLAG_NO_PITCH+MA_SOUND_FLAG_NO_SPATIALIZATION, NULL, NULL, &sound2);
-                            if (result != MA_SUCCESS) {
-                                return result;
-                            }
-                            ma_sound_set_start_time_in_milliseconds(&sound2, 0);
-                        }
-                    }
-                    if(cursor < length-0.1)
-                        sleep(0.01);
-                }
-            }
-            else{
-                ma_sound_start(&sound2);
-                ma_sound_get_length_in_seconds(&sound2, &length);
-                if(sound_initd)
-                    ma_sound_uninit(&sound);
-                while(ma_sound_is_playing(&sound2)){
-                    ma_sound_get_cursor_in_seconds(&sound2, &cursor);
-                    if(cursor + 1 > length && !preloaded && n+1 < sorted_by_name.size()){
-                        preloaded = true;
-                        n++;
-                        entry = *std::next(sorted_by_name.begin(), n);
-                        bool didntDoAnything = false;
-                        while(!entry.has_extension() || !isOneOfTheStrings(entry.extension().string().c_str(), supportedExtentions, 3)){
-                            n++;
-                            if(n >= sorted_by_name.size()){
-                                didntDoAnything = true;
-                                break;
-                            }
-                            entry = *std::next(sorted_by_name.begin(), n);
-                        }
-                        if(!didntDoAnything){
-                            result = ma_sound_init_from_file(&engine, entry.filename().string().c_str(), MA_SOUND_FLAG_NO_PITCH+MA_SOUND_FLAG_NO_SPATIALIZATION, NULL, NULL, &sound);
-                            if (result != MA_SUCCESS) {
-                                return result;
-                            }
-                            ma_sound_set_start_time_in_milliseconds(&sound, 0);
-                        }
-                    }
-                    if(cursor < length-0.1)
-                        sleep(0.01);
-                }
-            }
-            switchh = !switchh;
+        if(decoders.empty()){
+            cout << "No audio files found. Program cannot continue execution.";
+            return 0;
         }
+        ma_device_config devconf = ma_device_config_init(ma_device_type_playback);
+        devconf.playback.format = ma_format_f32;
+        devconf.playback.channels = 2;
+        devconf.sampleRate = decoders[0].outputSampleRate;
+        devconf.dataCallback = data_callback;
+        devconf.pUserData = NULL;
+
+        ma_device device;
+        if(ma_device_init(nullptr, &devconf, &device) != MA_SUCCESS){
+            cout << "Fatal error in audio device init. Program cannot continue execution.";
+        }
+        ma_device_start(&device);
+        while(!basicallyDone){
+            displayInterface(names[decoder_i].c_str(), 0, 0, true);
+            sleep(1);
+        }
+        ma_device_uninit(&device);
+        for(auto &decoder : decoders){
+            ma_decoder_uninit(&decoder);
+        }
+        return 0;
     }
 }
