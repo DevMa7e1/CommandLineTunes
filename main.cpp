@@ -21,6 +21,7 @@ bool isOneOfTheStrings(const char* a, const char** b, int nob){
             }
             i++;
         }
+        if(a[i] != 0x00 || b[j][i] != 0x00) yes2 = false;
         if(yes2){
             yes = true;
         }
@@ -49,13 +50,16 @@ void uni_clear(){
 #include <windows.h>
 string block = "]";
 string bar = "|";
-void sleep(float seconds){
-    Sleep(seconds*1000);
+void sleep(int milliseconds){
+    Sleep(milliseconds);
 }
 #else
 #include <unistd.h>
 string block = "█";
 string bar = "‖";
+void uni_sleep(int milliseconds){
+    usleep(milliseconds*1000);
+}
 #endif
 
 int nsindx = 0;
@@ -91,7 +95,14 @@ void displayInterface(const char* name, float cursor, float lenght, bool notr = 
         }
     }
     else{
-        cout << "--CONTINUOUS PLAY!--";
+        for(int i = 0; i < 20; i++){
+            if(cursor/lenght > 0.05*(i+1)){
+                cout << block;
+            }
+            else{
+                cout << "--CONTINUOUS PLAY!--"[i];
+            }
+        }
     }
     cout << "<" << bar << endl;
     for(int i = 0; i < 24; i++){
@@ -103,7 +114,7 @@ void displayInterface(const char* name, float cursor, float lenght, bool notr = 
 const char* supportedExtentions[3] = {".wav", ".flac", ".mp3"};
 const char* start_at[1] = {"--start-at"};
 const char* fade_time[1] = {"--fade-time"};
-const char* preload_and_zero_transition[1] = {"--no-transition"};
+const char* preload_and_zero_transition[2] = {"--continuous", "-c"};
 bool startAtDone = false;
 float fade_duration = 50;
 string specified = "";
@@ -154,7 +165,7 @@ int main(int argc, char** argv){
             else if(isOneOfTheStrings(argv[i], fade_time, 1)){
                 fade_duration = atof(argv[i+1]);
             }
-            else if(isOneOfTheStrings(argv[i], preload_and_zero_transition, 1)){
+            else if(isOneOfTheStrings(argv[i], preload_and_zero_transition, 2)){
                 preload = true;
             }
         }
@@ -233,7 +244,7 @@ int main(int argc, char** argv){
                         cout << "Volume: " << round(ma_sound_get_volume(&sound)*100) << "%" << endl;
                     }
                 }
-                sleep(0.01);
+                uni_sleep(10);
             }
             ma_sound_uninit(&sound);
             uni_clear();
@@ -241,9 +252,23 @@ int main(int argc, char** argv){
         }
     }}
     else{
+        set<fs::path> audio_files;
+        bool found = false;
+        for(auto &entry : sorted_by_name){
+            if(specified == ""){
+                audio_files.insert(entry);
+            }
+            else if(specified == entry.filename().string()){
+                found = true;
+                audio_files.insert(entry);
+            }
+            else if(found){
+                audio_files.insert(entry);
+            }
+        }
         ma_decoder_config config = ma_decoder_config_init(ma_format_f32, 2, 0);
         vector<string> names;
-        for(auto &entry : sorted_by_name){
+        for(auto &entry : audio_files){
             ma_decoder decoder;
             if(ma_decoder_init_file(entry.string().c_str(), &config, &decoder) != MA_SUCCESS){
                 cout << "Fatal problem loading " << entry.string() << ". Please make sure that the file is a valid audio file and try again.\n";
@@ -268,9 +293,60 @@ int main(int argc, char** argv){
             cout << "Fatal error in audio device init. Program cannot continue execution.";
         }
         ma_device_start(&device);
+        int cycle = 0;
+        bool fading_out = false;
+        bool fading_in = false;
+        float fade_cycle = 0;
+        float volume = 1.0f;
         while(!basicallyDone){
-            displayInterface(names[decoder_i].c_str(), 0, 0, true);
-            sleep(1);
+            ma_uint64 length;
+            ma_uint64 cursor;
+            ma_decoder_get_length_in_pcm_frames(&decoders[decoder_i], &length);
+            ma_decoder_get_cursor_in_pcm_frames(&decoders[decoder_i], &cursor);
+            if(cycle == 0){
+                displayInterface(names[decoder_i].c_str(), cursor, length, true);
+                if(!ma_device_is_started(&device)) cout << "*Paused*";
+            }
+            if(keyPressed()){
+                char key = getKey();
+                if(key == ' '){
+                    if(ma_device_is_started(&device))
+                        fading_out = true;
+                    else{
+                        ma_device_start(&device);
+                        ma_device_set_master_volume(&device, 0);
+                        fading_in = true;
+                    }
+                }
+                else if(key == '-'){
+                    if(volume > 0)
+                        volume -= 0.05;
+                    if(volume < 0.05)
+                        volume = 0;
+                    cout << "Volume: " << round(volume*100) << "%" << endl;
+                    ma_device_set_master_volume(&device, volume);
+                }
+                else if(key == '='){
+                    if(volume < 1)
+                        volume += 0.05;
+                    if(volume > 0.95)
+                        volume = 1;
+                    cout << "Volume: " << round(volume*100) << "%" << endl;
+                    ma_device_set_master_volume(&device, volume);
+                }
+            }
+            if(fading_in){
+                fade_cycle += 1;
+                if(fade_cycle >= 100){ ma_device_set_master_volume(&device, volume); fading_in = false; fade_cycle = 0;}
+                else ma_device_set_master_volume(&device, fade_cycle/100.0f * volume);
+            }
+            if(fading_out){
+                fade_cycle += 1;
+                if(fade_cycle >= 100){ ma_device_set_master_volume(&device, 0); fading_out = false; fade_cycle = 0; ma_device_stop(&device);}
+                else ma_device_set_master_volume(&device, (1.0f - fade_cycle/100.0f) * volume);
+            }
+            cycle = (cycle+1) % 100;
+            uni_sleep(10);
         }
         ma_device_uninit(&device);
         for(auto &decoder : decoders){
