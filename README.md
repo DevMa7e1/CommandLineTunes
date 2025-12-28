@@ -1,7 +1,8 @@
 # CommandLineTunes
 Simple audio player with a CLI.
 ## Features
-* Quick, clean crossfade between songs to avoid those annoying clicks at the start and end of songs
+* Quick, clean crossfade between songs to avoid those annoying clicks at the start and end of songs (in normal mode)
+* Continuous playback of songs with no transition (also known as gapless playback) (in continuous mode)
 * Simple, easy to use, text-only interface
 * Basic volume controls and the ability to skip songs
 * Plays mp3, wav and flac files
@@ -15,8 +16,10 @@ Simple audio player with a CLI.
 ## Arguments
 | Argument                     | What it does                             |
 |------------------------------|------------------------------------------|
+| --continuous OR -c           | Start CLTunes in continuous mode         |
 | --start-at < filename >      | Start playback at the file with that name|
 | --fade-time < milliseconds > | Milliseconds of fade between songs       |
+|                              | ^ Does nothing if in continuous mode. ^  |
 ## General information
 This software is written in C++. For audio playback, it uses the Miniaudio library.
 ## How to install

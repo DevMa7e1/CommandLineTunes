@@ -6,6 +6,7 @@
 #include <set>
 #include <vector>
 #include "keypress.hpp"
+#include <cstring>
 namespace fs = std::filesystem;
 
 using namespace std;
@@ -119,27 +120,16 @@ bool startAtDone = false;
 float fade_duration = 50;
 string specified = "";
 bool preload = false;
-vector<ma_decoder> decoders;
+vector<unique_ptr<ma_decoder>> decoders;
 size_t decoder_i;
-bool basicallyDone = false;
 
-void data_callback(ma_device* device, void* output, const void*, ma_uint32 framec){
-    float *out = static_cast<float*>(output);
-    ma_uint32 frames_r = framec;
-    while(frames_r > 0 && decoder_i < decoders.size()){
-        ma_uint64 frames_read = 0;
-        ma_decoder_read_pcm_frames(&decoders[decoder_i], out, frames_r, &frames_read);
-        if(frames_read == 0){
-            decoder_i++;
-            continue;
-        }
-        out += frames_read * device->playback.channels;
-        frames_r -= frames_read;
-    }
-    if(frames_r > 0){
-        fill(out, out + frames_r * device->playback.channels, 0.0f);
-        basicallyDone = true;
-    }
+void data_callback(ma_device *device, void* output, const void*, ma_uint32 framec){
+    ma_data_source_read_pcm_frames(decoders[decoder_i].get(), output, framec, NULL);
+}
+
+static ma_data_source* next_callback_tail(ma_data_source* pDataSource){
+    exit(0);
+    return &decoders[0];
 }
 
 int main(int argc, char** argv){
@@ -266,25 +256,10 @@ int main(int argc, char** argv){
                 audio_files.insert(entry);
             }
         }
-        ma_decoder_config config = ma_decoder_config_init(ma_format_f32, 2, 0);
-        vector<string> names;
-        for(auto &entry : audio_files){
-            ma_decoder decoder;
-            if(ma_decoder_init_file(entry.string().c_str(), &config, &decoder) != MA_SUCCESS){
-                cout << "Fatal problem loading " << entry.string() << ". Please make sure that the file is a valid audio file and try again.\n";
-                return 1;
-            }
-            decoders.push_back(decoder);
-            names.push_back(entry.filename().string());
-        }
-        if(decoders.empty()){
-            cout << "No audio files found. Program cannot continue execution.";
-            return 0;
-        }
         ma_device_config devconf = ma_device_config_init(ma_device_type_playback);
         devconf.playback.format = ma_format_f32;
         devconf.playback.channels = 2;
-        devconf.sampleRate = decoders[0].outputSampleRate;
+        devconf.sampleRate = 48000;
         devconf.dataCallback = data_callback;
         devconf.pUserData = NULL;
 
@@ -292,19 +267,41 @@ int main(int argc, char** argv){
         if(ma_device_init(nullptr, &devconf, &device) != MA_SUCCESS){
             cout << "Fatal error in audio device init. Program cannot continue execution.";
         }
+        ma_decoder_config config = ma_decoder_config_init(ma_format_f32, device.playback.channels, device.sampleRate);
+        vector<string> names;
+        decoders.reserve(sorted_by_name.size());
+        names.reserve(sorted_by_name.size());
+        for(auto &entry : audio_files){
+            auto decoder = make_unique<ma_decoder>();
+            if(ma_decoder_init_file(entry.string().c_str(), &config, decoder.get()) != MA_SUCCESS){
+                cout << "Fatal problem loading " << entry.string() << ". Please make sure that the file is a valid audio file and try again.\n";
+                return 1;
+            }
+            decoders.push_back(move(decoder));
+            names.push_back(entry.filename().string());
+        }
+        if(decoders.empty()){
+            cout << "No audio files found. Program cannot continue execution.";
+            return 0;
+        }
+        for(int i = 0; i + 1 < decoders.size(); i++){
+            ma_data_source_set_next(decoders[i].get(), decoders[i+1].get());
+        }
+        ma_data_source_set_next_callback(decoders[decoders.size()-1].get(), next_callback_tail);
         ma_device_start(&device);
         int cycle = 0;
         bool fading_out = false;
         bool fading_in = false;
         float fade_cycle = 0;
         float volume = 1.0f;
-        while(!basicallyDone){
+        while(1){
             ma_uint64 length;
             ma_uint64 cursor;
-            ma_decoder_get_length_in_pcm_frames(&decoders[decoder_i], &length);
-            ma_decoder_get_cursor_in_pcm_frames(&decoders[decoder_i], &cursor);
+            ma_uint64 dif = 0;
+            ma_decoder_get_length_in_pcm_frames(decoders[decoder_i].get(), &length);
+            ma_decoder_get_cursor_in_pcm_frames(decoders[decoder_i].get(), &cursor);
             if(cycle == 0){
-                displayInterface(names[decoder_i].c_str(), cursor, length, true);
+                displayInterface(names[decoder_i].c_str(), cursor-dif, length, true);
                 if(!ma_device_is_started(&device)) cout << "*Paused*";
             }
             if(keyPressed()){
@@ -346,11 +343,15 @@ int main(int argc, char** argv){
                 else ma_device_set_master_volume(&device, (1.0f - fade_cycle/100.0f) * volume);
             }
             cycle = (cycle+1) % 100;
+            if(cursor > length){
+                decoder_i++;
+                dif = length;
+            }
             uni_sleep(10);
         }
         ma_device_uninit(&device);
         for(auto &decoder : decoders){
-            ma_decoder_uninit(&decoder);
+            ma_decoder_uninit(decoder.get());
         }
         return 0;
     }
