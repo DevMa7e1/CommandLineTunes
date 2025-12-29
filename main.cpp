@@ -51,7 +51,7 @@ void uni_clear(){
 #include <windows.h>
 string block = "]";
 string bar = "|";
-void sleep(int milliseconds){
+void uni_sleep(int milliseconds){
     Sleep(milliseconds);
 }
 #else
