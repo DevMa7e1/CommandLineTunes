@@ -1,5 +1,5 @@
 @echo off
-powershell -c "Invoke-WebRequest 'https://github.com/DevMa7e1/CommandLineTunes/releases/download/v1.0.0/CLTunes.Windows-x86_64.exe' -OutFile .\cltunes.exe"
+powershell -c "Invoke-WebRequest 'https://github.com/DevMa7e1/CommandLineTunes/releases/download/v1.1.0/CLTunes.Windows-x86_64.exe' -OutFile .\cltunes.exe"
 mkdir "C:\Program Files\CLTunes"
 move cltunes.exe "C:\Program Files\CLTunes"
 powershell -c "try {$key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment', $true);$oldPath = $key.GetValue('Path', '', 'DoNotExpandEnvironmentNames').TrimEnd([IO.Path]::PathSeparator);$newPath = '{0}{1}{2}' -f $oldPath, [IO.Path]::PathSeparator, 'C:\Program Files\CLTunes';$key.SetValue('Path', $newPath, 'ExpandString')} finally {if ($null -ne $key) {$key.Dispose()}}"
