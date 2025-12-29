@@ -101,7 +101,7 @@ void displayInterface(const char* name, float cursor, float lenght, bool notr = 
                 cout << block;
             }
             else{
-                cout << "--CONTINUOUS PLAY!--"[i];
+                cout << "--CONTINUOUS MODE!--"[i];
             }
         }
     }
@@ -295,11 +295,11 @@ int main(int argc, char** argv){
         float fade_cycle = 0;
         float volume = 1.0f;
         while(1){
-            ma_uint64 length;
-            ma_uint64 cursor;
-            ma_uint64 dif = 0;
-            ma_decoder_get_length_in_pcm_frames(decoders[decoder_i].get(), &length);
-            ma_decoder_get_cursor_in_pcm_frames(decoders[decoder_i].get(), &cursor);
+            float length;
+            float cursor;
+            float dif = 0;
+            ma_data_source_get_length_in_seconds(decoders[decoder_i].get(), &length);
+            ma_data_source_get_cursor_in_seconds(decoders[decoder_i].get(), &cursor);
             if(cycle == 0){
                 displayInterface(names[decoder_i].c_str(), cursor-dif, length, true);
                 if(!ma_device_is_started(&device)) cout << "*Paused*";
@@ -343,7 +343,7 @@ int main(int argc, char** argv){
                 else ma_device_set_master_volume(&device, (1.0f - fade_cycle/100.0f) * volume);
             }
             cycle = (cycle+1) % 100;
-            if(cursor > length){
+            if(cursor >= length){
                 decoder_i++;
                 dif = length;
             }

@@ -40,18 +40,44 @@ Steps:
 6. Restart
 
 Done! Now you can just run the `cltunes` command in a terminal and start using CommandLineTunes. To get more information on how to use CommandLineTunes, check out the **How to use** section.
+
+### MacOS
+Steps:
+1. Download the latest pkg for your architecture from Releases
+2. Run and install the pkg
+
+Done! Now you can just run the `cltunes` command in a terminal and start using CommandLineTunes. To get more information on how to use CommandLineTunes, check out the **How to use** section.
 ## How to use
 CommandLineTunes plays every audio file in a folder in alphabetical order. If you want to make a "playlist", just copy the audio files you want in that "playlist" in an empty folder.
 
 To start playing the audio files, just open a terminal, navigate to that directory and run the `cltunes` command.
+
+CommandLineTunes has two modes: normal mode and continuous mode. For most songs, you're probably going to want to use the normal mode. If the songs you want to listen to transition from one another cleanly themselves, you can get a better experience with continuous mode. To use CommandLineTunes in continuous mode, just pass the -c or --continuous argument (run the command `cltunes -c`).
+
+If you hear relatively loud "popping" sounds when one song ends and another begins in continuous mode, it most likely means that those songs are not made to be played in such a way and should be played in normal mode.
 ## How to build
 ### Linux:
 Steps:
-1. Obtain a copy of miniaudio.h - `wget https://raw.githubusercontent.com/mackron/miniaudio/master/miniaudio.h`
-2. Obtain a copy of the source code - `git clone https://github.com/DevMa7e1/CommandLineTunes`
-3. Put the copy of miniaudio.h in the same directory as the source code - `mv miniaudio.h ./CommandLineTunes/`
-4. Go into the directory containing the source code - `cd CommandLineTunes`
-5. Compile with g++ - `g++ ./miniaudio.c ./main.cpp -o cltunes -ldl -lpthread -lm`
+1. Install git and wget <br>
+    **Debian, Ubuntu:**<br>
+    `sudo apt install wget git`<br>
+    **Arch Linux:**<br>
+    `sudo pacman -Syu wget git`<br>
+    **Fedora, RHEL, CentOS:**<br>
+    `sudo dnf install wget git`<br>
+
+2. Obtain a copy of miniaudio.h - `wget https://raw.githubusercontent.com/mackron/miniaudio/master/miniaudio.h`
+3. Obtain a copy of the source code - `git clone https://github.com/DevMa7e1/CommandLineTunes`
+4. Put the copy of miniaudio.h in the same directory as the source code - `mv miniaudio.h ./CommandLineTunes/`
+5. Make sure you have installed the essential packages for building CommandLineTunes
+    <br>**Debian, Ubuntu:**<br>
+    `sudo apt install build-essential libc6 libc++6 libgcc-s1`<br>
+    **Arch Linux:**<br>
+    `sudo pacman -Syu gcc libc6 libc++6 libgcc-s1`<br>
+    **Fedora, RHEL, CentOS:**<br>
+    `sudo dnf install gcc libc6 libc++6 libgcc-s1`<br>
+6. Go into the directory containing the source code - `cd CommandLineTunes`
+7. Compile with gcc - `g++ ./miniaudio.c ./main.cpp -o cltunes -ldl -lpthread -lm`
 
 ### Windows
 Steps:
@@ -73,5 +99,5 @@ Steps:
 4. Download a copy of miniaudio.h from [here](https://raw.githubusercontent.com/mackron/miniaudio/master/miniaudio.h) (right click, Save Page As...)
 5. Rename the resulting file to miniaudio.h
 6. Put the copy of miniaudio.h in the same directory as the source code
-7. Go into the directory containing the source code
-8. In a terminal, run `g++ miniaudio.c main.cpp -o cltunes -std=c++17`
+8. Open a terminal and go into the directory containing the source code
+8. Run the command `g++ miniaudio.c main.cpp -o cltunes -std=c++17`
