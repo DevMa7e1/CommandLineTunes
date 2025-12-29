@@ -40,13 +40,6 @@ Steps:
 6. Restart
 
 Done! Now you can just run the `cltunes` command in a terminal and start using CommandLineTunes. To get more information on how to use CommandLineTunes, check out the **How to use** section.
-
-### MacOS
-Steps:
-1. Download the latest pkg for your architecture from Releases
-2. Run and install the pkg
-
-Done! Now you can just run the `cltunes` command in a terminal and start using CommandLineTunes. To get more information on how to use CommandLineTunes, check out the **How to use** section.
 ## How to use
 CommandLineTunes plays every audio file in a folder in alphabetical order. If you want to make a "playlist", just copy the audio files you want in that "playlist" in an empty folder.
 
