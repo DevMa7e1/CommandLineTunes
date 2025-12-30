@@ -113,13 +113,9 @@ void displayInterface(const char* name, float cursor, float lenght, bool notr = 
 }
 
 const char* supportedExtentions[3] = {".wav", ".flac", ".mp3"};
-const char* start_at[1] = {"--start-at"};
 const char* fade_time[1] = {"--fade-time"};
 const char* preload_and_zero_transition[2] = {"--continuous", "-c"};
-bool startAtDone = false;
 float fade_duration = 50;
-string specified = "";
-bool preload = false;
 vector<unique_ptr<ma_decoder>> decoders;
 size_t decoder_i;
 
@@ -132,40 +128,15 @@ static ma_data_source* next_callback_tail(ma_data_source* pDataSource){
     return &decoders[0];
 }
 
-int main(int argc, char** argv){
+int normalModePlay(set<fs::path> sorted_by_name){
     ma_result result;
     ma_sound sound;
     ma_engine engine;
     result = ma_engine_init(NULL, &engine);
     if (result != MA_SUCCESS) {
-        return result;
+        exit(result);
     }
-    std::string path = std::filesystem::current_path().string();
-    set<fs::path> sorted_by_name;
-
-    for (auto &entry : fs::directory_iterator(path)){
-        if(entry.path().has_extension() && isOneOfTheStrings(entry.path().extension().string().c_str(), supportedExtentions, 3))
-            sorted_by_name.insert(entry.path());
-    }
-    if(argc > 1){
-        for(int i = 0; i < argc; i++){
-            if(isOneOfTheStrings(argv[i], start_at, 1) && !startAtDone){
-                specified = argv[i+1];
-            }
-            else if(isOneOfTheStrings(argv[i], fade_time, 1)){
-                fade_duration = atof(argv[i+1]);
-            }
-            else if(isOneOfTheStrings(argv[i], preload_and_zero_transition, 2)){
-                preload = true;
-            }
-        }
-    }
-    if(!preload){
     for (auto &entry : sorted_by_name){
-        if(specified != "" && specified != entry.filename().string() && !startAtDone)
-            continue;
-        else                        
-            startAtDone = true;
         if(true){
             result = ma_sound_init_from_file(&engine, entry.filename().string().c_str(), MA_SOUND_FLAG_NO_PITCH+MA_SOUND_FLAG_NO_SPATIALIZATION, NULL, NULL, &sound);
             if (result != MA_SUCCESS) {
@@ -211,7 +182,7 @@ int main(int argc, char** argv){
                             paused = false;
                             result = ma_sound_init_from_file(&engine, entry.filename().string().c_str(), 0, NULL, NULL, &sound);
                             if (result != MA_SUCCESS) {
-                                return result;
+                                exit(result);
                             }
                             ma_sound_set_fade_in_milliseconds(&sound, 0, 1, 250);
                             ma_sound_seek_to_second(&sound, cursor_paused);
@@ -233,6 +204,12 @@ int main(int argc, char** argv){
                             ma_sound_set_volume(&sound, ma_sound_get_volume(&sound)+0.05);
                         cout << "Volume: " << round(ma_sound_get_volume(&sound)*100) << "%" << endl;
                     }
+                    else if(key == 'x'){
+                        ma_sound_stop(&sound);
+                        ma_sound_uninit(&sound);
+                        ma_engine_uninit(&engine);
+                        return 0;
+                    }
                 }
                 uni_sleep(10);
             }
@@ -240,119 +217,228 @@ int main(int argc, char** argv){
             uni_clear();
             cout << entry.filename().string().c_str() << " finished playing.";
         }
-    }}
-    else{
-        set<fs::path> audio_files;
-        bool found = false;
-        for(auto &entry : sorted_by_name){
-            if(specified == ""){
-                audio_files.insert(entry);
-            }
-            else if(specified == entry.filename().string()){
-                found = true;
-                audio_files.insert(entry);
-            }
-            else if(found){
-                audio_files.insert(entry);
-            }
-        }
-        ma_device_config devconf = ma_device_config_init(ma_device_type_playback);
-        devconf.playback.format = ma_format_f32;
-        devconf.playback.channels = 2;
-        devconf.sampleRate = 48000;
-        devconf.dataCallback = data_callback;
-        devconf.pUserData = NULL;
+    }
+    return 0;
+}
 
-        ma_device device;
-        if(ma_device_init(nullptr, &devconf, &device) != MA_SUCCESS){
-            cout << "Fatal error in audio device init. Program cannot continue execution.";
+int continuousModePlay(set<fs::path> sorted_by_name){
+    ma_device_config devconf = ma_device_config_init(ma_device_type_playback);
+    devconf.playback.format = ma_format_f32;
+    devconf.playback.channels = 2;
+    devconf.sampleRate = 48000;
+    devconf.dataCallback = data_callback;
+    devconf.pUserData = NULL;
+    ma_device device;
+    if(ma_device_init(nullptr, &devconf, &device) != MA_SUCCESS){
+        cout << "Fatal error in audio device init. Program cannot continue execution.";
+    }
+    ma_decoder_config config = ma_decoder_config_init(ma_format_f32, device.playback.channels, device.sampleRate);
+    vector<string> names;
+    decoders.reserve(sorted_by_name.size());
+    names.reserve(sorted_by_name.size());
+    for(auto &entry : sorted_by_name){
+        auto decoder = make_unique<ma_decoder>();
+        if(ma_decoder_init_file(entry.string().c_str(), &config, decoder.get()) != MA_SUCCESS){
+            cout << "Fatal problem loading " << entry.string() << ". Please make sure that the file is a valid audio file and try again.\n";
+            return 1;
         }
-        ma_decoder_config config = ma_decoder_config_init(ma_format_f32, device.playback.channels, device.sampleRate);
-        vector<string> names;
-        decoders.reserve(sorted_by_name.size());
-        names.reserve(sorted_by_name.size());
-        for(auto &entry : audio_files){
-            auto decoder = make_unique<ma_decoder>();
-            if(ma_decoder_init_file(entry.string().c_str(), &config, decoder.get()) != MA_SUCCESS){
-                cout << "Fatal problem loading " << entry.string() << ". Please make sure that the file is a valid audio file and try again.\n";
-                return 1;
+        decoders.push_back(move(decoder));
+        names.push_back(entry.filename().string());
+    }
+    if(decoders.empty()){
+        cout << "No audio files found. Program cannot continue execution.";
+        return 0;
+    }
+    for(int i = 0; i + 1 < decoders.size(); i++){
+        ma_data_source_set_next(decoders[i].get(), decoders[i+1].get());
+    }
+    ma_data_source_set_next_callback(decoders[decoders.size()-1].get(), next_callback_tail);
+    ma_device_start(&device);
+    int cycle = 0;
+    bool fading_out = false;
+    bool fading_in = false;
+    float fade_cycle = 0;
+    float volume = 1.0f;
+    while(1){
+        float length;
+        float cursor;
+        float dif = 0;
+        ma_data_source_get_length_in_seconds(decoders[decoder_i].get(), &length);
+        ma_data_source_get_cursor_in_seconds(decoders[decoder_i].get(), &cursor);
+        if(cycle == 0){
+            displayInterface(names[decoder_i].c_str(), cursor-dif, length, true);
+            if(!ma_device_is_started(&device)) cout << "*Paused*";
+        }
+        if(keyPressed()){
+            char key = getKey();
+            if(key == ' '){
+                if(ma_device_is_started(&device))
+                    fading_out = true;
+                else{
+                    ma_device_start(&device);
+                    ma_device_set_master_volume(&device, 0);
+                    fading_in = true;
+                }
             }
-            decoders.push_back(move(decoder));
-            names.push_back(entry.filename().string());
-        }
-        if(decoders.empty()){
-            cout << "No audio files found. Program cannot continue execution.";
-            return 0;
-        }
-        for(int i = 0; i + 1 < decoders.size(); i++){
-            ma_data_source_set_next(decoders[i].get(), decoders[i+1].get());
-        }
-        ma_data_source_set_next_callback(decoders[decoders.size()-1].get(), next_callback_tail);
-        ma_device_start(&device);
-        int cycle = 0;
-        bool fading_out = false;
-        bool fading_in = false;
-        float fade_cycle = 0;
-        float volume = 1.0f;
-        while(1){
-            float length;
-            float cursor;
-            float dif = 0;
-            ma_data_source_get_length_in_seconds(decoders[decoder_i].get(), &length);
-            ma_data_source_get_cursor_in_seconds(decoders[decoder_i].get(), &cursor);
-            if(cycle == 0){
-                displayInterface(names[decoder_i].c_str(), cursor-dif, length, true);
-                if(!ma_device_is_started(&device)) cout << "*Paused*";
+            else if(key == '-'){
+                if(volume > 0)
+                    volume -= 0.05;
+                if(volume < 0.05)
+                    volume = 0;
+                cout << "Volume: " << round(volume*100) << "%" << endl;
+                ma_device_set_master_volume(&device, volume);
             }
-            if(keyPressed()){
-                char key = getKey();
-                if(key == ' '){
-                    if(ma_device_is_started(&device))
-                        fading_out = true;
-                    else{
-                        ma_device_start(&device);
-                        ma_device_set_master_volume(&device, 0);
-                        fading_in = true;
+            else if(key == '='){
+                if(volume < 1)
+                    volume += 0.05;
+                if(volume > 0.95)
+                    volume = 1;
+                cout << "Volume: " << round(volume*100) << "%" << endl;
+                ma_device_set_master_volume(&device, volume);
+            }
+            else if(key == 'x'){
+                ma_device_stop(&device);
+                ma_device_uninit(&device);
+                for(auto &decoder : decoders){
+                    ma_data_source_uninit(decoder.get());
+                    ma_decoder_uninit(decoder.get());
+                }
+                decoders.clear();
+                decoder_i = 0;
+                return 0;
+            }
+        }
+        if(fading_in){
+            fade_cycle += 1;
+            if(fade_cycle >= 100){ ma_device_set_master_volume(&device, volume); fading_in = false; fade_cycle = 0;}
+            else ma_device_set_master_volume(&device, fade_cycle/100.0f * volume);
+        }
+        if(fading_out){
+            fade_cycle += 1;
+            if(fade_cycle >= 100){ ma_device_set_master_volume(&device, 0); fading_out = false; fade_cycle = 0; ma_device_stop(&device);}
+            else ma_device_set_master_volume(&device, (1.0f - fade_cycle/100.0f) * volume);
+        }
+        cycle = (cycle+1) % 100;
+        if(cursor >= length){
+            decoder_i++;
+            dif = length;
+        }
+        uni_sleep(10);
+    }
+    ma_device_uninit(&device);
+    for(auto &decoder : decoders){
+        ma_decoder_uninit(decoder.get());
+    }
+    return 0;
+}
+
+set<fs::path> loadFiles(string path, int pointer = -1){
+    set<fs::path> sorted_by_name;
+    for (auto &entry : fs::directory_iterator(path)){
+        if(entry.path().has_extension() && isOneOfTheStrings(entry.path().extension().string().c_str(), supportedExtentions, 3))
+            sorted_by_name.insert(entry.path());
+    }
+    set<fs::path> sorted_by_name2;
+    int i = 0;
+    for(auto &entry : sorted_by_name){
+        if(i >= pointer){
+            sorted_by_name2.insert(entry);
+        }
+        i++;
+    }
+    return sorted_by_name2;
+}
+
+std::string path = std::filesystem::current_path().string();
+string explorer_command = "";
+int pointer = -1;
+int main(int argc, char** argv){
+    if(argc > 1){
+        for(int i = 0; i < argc; i++){
+            if(isOneOfTheStrings(argv[i], fade_time, 1)){
+                fade_duration = atof(argv[i+1]);
+            }
+        }
+    }
+    displayInterface("No file", 0, 1);
+    while(1){
+        cout << "CLTunes@" << path << "# ";
+        cin >> explorer_command;
+        if(explorer_command == "ls"){
+            int music_files = 0;
+            for(auto &entry : fs::directory_iterator(path)){
+                if(entry.is_directory()){
+                    cout << entry.path().filename().string() << "/" << endl;
+                }
+                else{
+                    if(entry.path().has_extension() && isOneOfTheStrings(entry.path().extension().string().c_str(), supportedExtentions, 3)){
+                        cout << entry.path().filename().string() << endl;
+                        music_files++;
                     }
                 }
-                else if(key == '-'){
-                    if(volume > 0)
-                        volume -= 0.05;
-                    if(volume < 0.05)
-                        volume = 0;
-                    cout << "Volume: " << round(volume*100) << "%" << endl;
-                    ma_device_set_master_volume(&device, volume);
-                }
-                else if(key == '='){
-                    if(volume < 1)
-                        volume += 0.05;
-                    if(volume > 0.95)
-                        volume = 1;
-                    cout << "Volume: " << round(volume*100) << "%" << endl;
-                    ma_device_set_master_volume(&device, volume);
-                }
             }
-            if(fading_in){
-                fade_cycle += 1;
-                if(fade_cycle >= 100){ ma_device_set_master_volume(&device, volume); fading_in = false; fade_cycle = 0;}
-                else ma_device_set_master_volume(&device, fade_cycle/100.0f * volume);
+            if(music_files == 0){
+                cout << "This folder contains no music files." << endl;
             }
-            if(fading_out){
-                fade_cycle += 1;
-                if(fade_cycle >= 100){ ma_device_set_master_volume(&device, 0); fading_out = false; fade_cycle = 0; ma_device_stop(&device);}
-                else ma_device_set_master_volume(&device, (1.0f - fade_cycle/100.0f) * volume);
-            }
-            cycle = (cycle+1) % 100;
-            if(cursor >= length){
-                decoder_i++;
-                dif = length;
-            }
-            uni_sleep(10);
         }
-        ma_device_uninit(&device);
-        for(auto &decoder : decoders){
-            ma_decoder_uninit(decoder.get());
+        else if(explorer_command == "cd"){
+            string where;
+            cin >> where;
+            string last_path = path;
+            path.append("/");
+            path.append(where);
+            if(!fs::is_directory(path)){
+                path = last_path;
+                cout << where << " is not a valid directory." << endl;
+            }
+            if(where == ".."){
+                path.erase(path.rfind('/'));
+                path.erase(path.rfind('/'));
+            }
+            if(where == "."){
+                path.erase(path.rfind('/'));
+            }
         }
-        return 0;
+        else if(explorer_command == "exit"){
+            exit(0);
+        }
+        else if(explorer_command == "clear"){
+            displayInterface("No file", 0, 1);
+        }
+        else if(explorer_command == "play"){
+            set<fs::path> sorted_by_name = loadFiles(path, pointer);
+            cin >> explorer_command;
+            if(explorer_command == "c"){
+                continuousModePlay(sorted_by_name);
+                displayInterface("No file", 0, 1);
+            }
+            else if(explorer_command == "n"){
+                normalModePlay(sorted_by_name);
+                displayInterface("No file", 0, 1);
+            }
+            else
+                cout << "Invalid option." << endl;
+        }
+        else if(explorer_command == "point"){
+            set<fs::path> sorted_by_name = loadFiles(path);
+            cin >> pointer;
+            if(pointer < 0 || pointer >= sorted_by_name.size()){
+                pointer = -1;
+            }
+        }
+        else if(explorer_command == "pointer"){
+            if(pointer != -1){
+                set<fs::path> sorted_by_name = loadFiles(path);
+                std::set<fs::path>::iterator it = sorted_by_name.begin();
+                std::advance(it, pointer);
+                cout << (*it).filename().string() << endl;
+            }
+            else{
+                cout << "There is no file being pointed to." << endl;
+            }
+        }
+        else{
+            cout << "Invalid command." << endl;
+        }
     }
 }
