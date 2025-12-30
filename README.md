@@ -19,10 +19,11 @@ Steps:
 Done! Now you can just run the `cltunes` command in a terminal and start using CommandLineTunes. To get more information on how to use CommandLineTunes, check out the **How to use** section.
 ### Windows:
 Steps:
-1. Download the install.bat script from [here](https://raw.githubusercontent.com/DevMa7e1/CommandLineTunes/refs/heads/main/install.bat) (hit ctrl+s on the page)
+1. Download the install.bat script from [here](https://raw.githubusercontent.com/DevMa7e1/CommandLineTunes/refs/heads/main/install.bat) (hit ctrl+s on the page) (make sure to save it as a .bat file)
 2. In the Windows Start Menu search bar, type cmd
 3. Click on run as administrator
 4. Drag the install.bat script into the cmd window
+    * If this doesn't automatically type the path of the install.bat file, please manually navigate to the directory where you downloaded install.bat and run the command `install.bat`
 5. Hit enter
 6. Restart
 
