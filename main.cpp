@@ -141,7 +141,7 @@ int normalModePlay(set<fs::path> sorted_by_name){
     }
     for (auto &entry : sorted_by_name){
         if(true){
-            result = ma_sound_init_from_file(&engine, entry.filename().string().c_str(), MA_SOUND_FLAG_NO_PITCH+MA_SOUND_FLAG_NO_SPATIALIZATION, NULL, NULL, &sound);
+            result = ma_sound_init_from_file(&engine, entry.string().c_str(), MA_SOUND_FLAG_NO_PITCH+MA_SOUND_FLAG_NO_SPATIALIZATION, NULL, NULL, &sound);
             if (result != MA_SUCCESS) {
                 return result;
             }
