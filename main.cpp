@@ -51,6 +51,7 @@ void uni_clear(){
 #include <windows.h>
 string block = "]";
 string bar = "|";
+string sepr = "\\";
 void uni_sleep(int milliseconds){
     Sleep(milliseconds);
 }
@@ -58,6 +59,7 @@ void uni_sleep(int milliseconds){
 #include <unistd.h>
 string block = "█";
 string bar = "‖";
+string sepr = "/";
 void uni_sleep(int milliseconds){
     usleep(milliseconds*1000);
 }
@@ -434,7 +436,7 @@ int main(int argc, char** argv){
                 where = where2;
             }
             string last_path = path;
-            path.append("/");
+            path.append(sepr);
             path.append(where);
             if(!fs::is_directory(path)){
                 path = last_path;
@@ -445,11 +447,11 @@ int main(int argc, char** argv){
                     cout << where2 << " is not a valid directory." << endl;
             }
             if(where == ".."){
-                path.erase(path.rfind('/'));
-                path.erase(path.rfind('/'));
+                path.erase(path.rfind(sepr[0]));
+                path.erase(path.rfind(sepr[0]));
             }
             if(where == "."){
-                path.erase(path.rfind('/'));
+                path.erase(path.rfind(sepr[0]));
             }
         }
         else if(explorer_command == "exit"){
