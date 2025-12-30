@@ -109,7 +109,7 @@ Steps:
     **Fedora, RHEL, CentOS:**<br>
     `sudo dnf install gcc libc6 libc++6 libgcc-s1`<br>
 6. Go into the directory containing the source code - `cd CommandLineTunes`
-7. Compile with gcc - `g++ ./miniaudio.c ./main.cpp -o cltunes -ldl -lpthread -lm`
+7. Compile with gcc - `g++ ./main.cpp -o cltunes -ldl -lpthread -lm`
 
 ### Windows
 Steps:
@@ -120,7 +120,7 @@ Steps:
 4. Unzip the source code
 5. Move the miniaudio.h file into the directory with the source code
 6. Open a terminal in that directory
-7. Run the command `g++ miniaudio.c main.cpp -o cltunes.exe -static`
+7. Run the command `g++ main.cpp -o cltunes.exe -static`
 8. Done
 
 ### MacOS
@@ -132,4 +132,4 @@ Steps:
 5. Rename the resulting file to miniaudio.h
 6. Put the copy of miniaudio.h in the same directory as the source code
 8. Open a terminal and go into the directory containing the source code
-8. Run the command `g++ miniaudio.c main.cpp -o cltunes -std=c++17`
+8. Run the command `g++ main.cpp -o cltunes -std=c++17`
