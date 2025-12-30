@@ -3,23 +3,9 @@ Simple audio player with a CLI.
 ## Features
 * Quick, clean crossfade between songs to avoid those annoying clicks at the start and end of songs (in normal mode)
 * Continuous playback of songs with no transition (also known as gapless playback) (in continuous mode)
-* Simple, easy to use, text-only interface
-* Basic volume controls and the ability to skip songs
+* Simple, easy to use, text-only CLI
+* Basic volume controls and the ability to skip songs (in normal mode)
 * Plays mp3, wav and flac files
-## Controls
-| Key        | Action          |
-|------------|-----------------|
-| Tab        | Skip song       |
-| Space      | Pause           |
-| Equals key | Increase volume |
-| Minus key  | Decrease volume |
-## Arguments
-| Argument                     | What it does                             |
-|------------------------------|------------------------------------------|
-| --continuous OR -c           | Start CLTunes in continuous mode         |
-| --start-at < filename >      | Start playback at the file with that name|
-| --fade-time < milliseconds > | Milliseconds of fade between songs       |
-|                              | ^ Does nothing if in continuous mode. ^  |
 ## General information
 This software is written in C++. For audio playback, it uses the Miniaudio library.
 ## How to install
@@ -27,6 +13,7 @@ This software is written in C++. For audio playback, it uses the Miniaudio libra
 Steps:
 1. Download the install.sh script - `wget https://raw.githubusercontent.com/DevMa7e1/CommandLineTunes/refs/heads/main/install.sh`
 2. Chmod the script - `chmod +x install.sh`
+    * If you are using a distro that does not have the `apt` command, please edit line 6 in install.sh and replace `apt` with your distro's package manager.
 3. Run the script as root - `sudo ./install.sh`
 
 Done! Now you can just run the `cltunes` command in a terminal and start using CommandLineTunes. To get more information on how to use CommandLineTunes, check out the **How to use** section.
@@ -41,13 +28,65 @@ Steps:
 
 Done! Now you can just run the `cltunes` command in a terminal and start using CommandLineTunes. To get more information on how to use CommandLineTunes, check out the **How to use** section.
 ## How to use
-CommandLineTunes plays every audio file in a folder in alphabetical order. If you want to make a "playlist", just copy the audio files you want in that "playlist" in an empty folder.
+When you run the `cltunes` command, you're met with the CLTunes CLI. From here, you can navigate to folders and start playback.
 
-To start playing the audio files, just open a terminal, navigate to that directory and run the `cltunes` command.
+### In the CLTunes CLI:
+#### `help` command:
+To see a list of commands and what they do, just run the command `help`.
+#### `ls` command:
+To see if the directory you're currently in has any audio files and what other directories it contains, just run the command `ls`. The `ls` command also showes the ID of each music file.
 
-CommandLineTunes has two modes: normal mode and continuous mode. For most songs, you're probably going to want to use the normal mode. If the songs you want to listen to transition from one another cleanly themselves, you can get a better experience with continuous mode. To use CommandLineTunes in continuous mode, just pass the -c or --continuous argument (run the command `cltunes -c`).
+If you set CLTunes to point to a file, the `ls` command will put a little arrow (<--) in front of the file being pointed to.
+#### `cd` command:
+The `cd` command changes the directory being interacted with in the CLI. You can only "`cd`" into directories available in the currently being interacted with directory.
 
-If you hear relatively loud "popping" sounds when one song ends and another begins in continuous mode, it most likely means that those songs are not made to be played in such a way and should be played in normal mode.
+If the name of a directory you wanna andvance into contains spaces, replace the spaces with a / (e.g., to go into "folder name with spaces", you'd run the command `cd folder/name/with/spaces`). Otherwise, the CLTunes CLI command interpreter would just interpret the other segments of the name as seperate commands (e.g. `cd folder name with spaces` gets interpreted as `cd folder` then `name` then `with` then `spaces`).
+
+If you know the start of the name of a folder but not all of it, you can just type what you know and put a * at the end. Doing this will make the CLTunes CLI command interpreter pick the first folder it comes across starting with the text before the *.
+#### `point` and `pointer` command:
+To start playback at a specific file, you have to make CLTunes "point" at it.
+
+To get the file at which CLTunes is pointing, run the `pointer` command.
+
+To point to a file, just get the audio file's ID from the `ls` command and pass it to the `point` command.
+Example:
+```
+CLTunes@/home/user/Music# ls
+0 - play.wav
+1 - stay.wav
+2 - wait.wav
+3 - love.wav
+CLTunes@/home/dev/CommandLineTunes# point 2
+CLTunes@/home/dev/CommandLineTunes# pointer
+wait.wav
+```
+#### `play` command:
+To start playback of the audio files in the currently being interacted with directory, just run one of the play commands: `play n` or `play c`
+
+`play n` starts playback in the normal mode. Most songs should be played with the normal mode. Though, if you suspect that the songs you're listening to transition from one another themselves, you should try playing them with `play c`.
+
+`play c` starts playback in the continuous mode. If when listening to songs in this mode you hear relatively loud "popping sounds", it most likely means that the songs you're listening to aren't made to be played in such a mode or that they aren't being played in the correct order. The way continuous mode works might better be known under the name of "gapless playback".
+#### `clear` command:
+Clears the terminal screen.
+
+Have too much text on the screen and want to clear it up? Run the `clear` command.
+#### `exit` command:
+Exits the CLTunes CLI.
+
+### After running one of the `play` commands:
+You can control the playback by pressing singular keys.
+
+| Key        | Action                           |
+|------------|----------------------------------|
+| Tab        | Skip song (in normal mode)       |
+| Space      | Pause                            |
+| Equals key | Increase volume                  |
+| Minus key  | Decrease volume                  |
+| X key      | Stop playback, return to the CLI |
+
+### Extra
+If you want to change the time it takes to fade in and out between songs in normal mode, just pass the --fade-time argument and the number of milliseconds of fading when running CLTunes (e.g. `cltunes --fade-time 250`).
+
 ## How to build
 ### Linux:
 Steps:

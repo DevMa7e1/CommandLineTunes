@@ -118,13 +118,14 @@ const char* preload_and_zero_transition[2] = {"--continuous", "-c"};
 float fade_duration = 50;
 vector<unique_ptr<ma_decoder>> decoders;
 size_t decoder_i;
+bool callback_signal = false;
 
 void data_callback(ma_device *device, void* output, const void*, ma_uint32 framec){
     ma_data_source_read_pcm_frames(decoders[decoder_i].get(), output, framec, NULL);
 }
 
 static ma_data_source* next_callback_tail(ma_data_source* pDataSource){
-    exit(0);
+    callback_signal = true;
     return &decoders[0];
 }
 
@@ -214,10 +215,9 @@ int normalModePlay(set<fs::path> sorted_by_name){
                 uni_sleep(10);
             }
             ma_sound_uninit(&sound);
-            uni_clear();
-            cout << entry.filename().string().c_str() << " finished playing.";
         }
     }
+    ma_engine_uninit(&engine);
     return 0;
 }
 
@@ -231,6 +231,7 @@ int continuousModePlay(set<fs::path> sorted_by_name){
     ma_device device;
     if(ma_device_init(nullptr, &devconf, &device) != MA_SUCCESS){
         cout << "Fatal error in audio device init. Program cannot continue execution.";
+        return 1;
     }
     ma_decoder_config config = ma_decoder_config_init(ma_format_f32, device.playback.channels, device.sampleRate);
     vector<string> names;
@@ -246,7 +247,7 @@ int continuousModePlay(set<fs::path> sorted_by_name){
         names.push_back(entry.filename().string());
     }
     if(decoders.empty()){
-        cout << "No audio files found. Program cannot continue execution.";
+        cout << "No audio files found.";
         return 0;
     }
     for(int i = 0; i + 1 < decoders.size(); i++){
@@ -259,7 +260,7 @@ int continuousModePlay(set<fs::path> sorted_by_name){
     bool fading_in = false;
     float fade_cycle = 0;
     float volume = 1.0f;
-    while(1){
+    while(!callback_signal){
         float length;
         float cursor;
         float dif = 0;
@@ -325,10 +326,14 @@ int continuousModePlay(set<fs::path> sorted_by_name){
         }
         uni_sleep(10);
     }
+    ma_device_stop(&device);
     ma_device_uninit(&device);
     for(auto &decoder : decoders){
+        ma_data_source_uninit(decoder.get());
         ma_decoder_uninit(decoder.get());
     }
+    decoders.clear();
+    decoder_i = 0;
     return 0;
 }
 
@@ -349,6 +354,29 @@ set<fs::path> loadFiles(string path, int pointer = -1){
     return sorted_by_name2;
 }
 
+bool stringHasPrefix(string a, string b){
+    if(a.size() < b.size()){
+        return false;
+    }
+    else{
+        bool yes = true;
+        for(int i = 0; i < b.size(); i++){
+            if(a[i] != b[i]){
+                yes = false;
+                break;
+            }
+        }
+        return yes;
+    }
+}
+
+string replaceChar(string s, char a, char b){
+    for(int i = 0; i < s.size(); i++){
+        if(s[i] == a) s[i] = b;
+    }
+    return s;
+}
+
 std::string path = std::filesystem::current_path().string();
 string explorer_command = "";
 int pointer = -1;
@@ -361,6 +389,7 @@ int main(int argc, char** argv){
         }
     }
     displayInterface("No file", 0, 1);
+    cout << "Welcome to CLTunes!\nType help for a list of commands available." << endl << endl;
     while(1){
         cout << "CLTunes@" << path << "# ";
         cin >> explorer_command;
@@ -370,26 +399,50 @@ int main(int argc, char** argv){
                 if(entry.is_directory()){
                     cout << entry.path().filename().string() << "/" << endl;
                 }
-                else{
-                    if(entry.path().has_extension() && isOneOfTheStrings(entry.path().extension().string().c_str(), supportedExtentions, 3)){
-                        cout << entry.path().filename().string() << endl;
-                        music_files++;
-                    }
+            }
+            for(auto &entry : loadFiles(path)){
+                if(entry.has_extension() && isOneOfTheStrings(entry.extension().string().c_str(), supportedExtentions, 3)){
+                    if(pointer != -1 && pointer == music_files)
+                        cout << music_files << " - " << entry.filename().string() << " <--" << endl;
+                    else
+                        cout << music_files << " - " << entry.filename().string() << endl;
+                    music_files++;
                 }
             }
             if(music_files == 0){
-                cout << "This folder contains no music files." << endl;
+                cout << "This folder contains no supported music files." << endl;
             }
         }
         else if(explorer_command == "cd"){
             string where;
             cin >> where;
+            where = replaceChar(where, '/', ' ');
+            string where2 = where;
+            if(where.erase(0, where.size()-1) == "*"){
+                where2.erase(where2.size()-1);
+                for(auto &entry : fs::directory_iterator(path)){
+                    if(entry.is_directory() && stringHasPrefix(entry.path().filename().string(), where2)){
+                        where = entry.path().filename().string();
+                        break;
+                    }
+                }
+                if(where == "*"){
+                    where = where2+"*";
+                }
+            }
+            else{
+                where = where2;
+            }
             string last_path = path;
             path.append("/");
             path.append(where);
             if(!fs::is_directory(path)){
                 path = last_path;
-                cout << where << " is not a valid directory." << endl;
+                where2 = where;
+                if(where.erase(0, where.size()-1) == "*")
+                    cout << "No directory matches the pattern " << where2 << endl;
+                else
+                    cout << where2 << " is not a valid directory." << endl;
             }
             if(where == ".."){
                 path.erase(path.rfind('/'));
@@ -436,6 +489,17 @@ int main(int argc, char** argv){
             else{
                 cout << "There is no file being pointed to." << endl;
             }
+        }
+        else if(explorer_command == "help"){
+            cout << "CLTunes CLI commands:" << endl;
+            cout << "ls - list directories and music files" << endl;
+            cout << "cd - change directory" << endl;
+            cout << "point # - change the pointer's number - replace the # with a number" << endl;
+            cout << "pointer - print out the name of the file being pointed to" << endl;
+            cout << "play n - play the music files in the directory in normal mode" << endl;
+            cout << "play c - play the music files in the directory in continuous mode" << endl;
+            cout << "clear - clear screen" << endl;
+            cout << "exit - exit CLTunes" << endl;
         }
         else{
             cout << "Invalid command." << endl;
